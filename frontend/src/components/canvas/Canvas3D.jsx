@@ -3,6 +3,7 @@ import { Canvas, useThree } from '@react-three/fiber';
 import { ContactShadows, Environment, Grid, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDesignStore } from '../../store/useDesignStore';
+import { useUIStore } from '../../store/useUIStore';
 
 const SCALE = 100;
 
@@ -235,6 +236,7 @@ function DraggableObject({ obj, isSelected, onClick, onGrabStart, onDragStart, o
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
     >
       {getModel()}
       {isSelected && (
@@ -247,7 +249,7 @@ function DraggableObject({ obj, isSelected, onClick, onGrabStart, onDragStart, o
   );
 }
 
-function SceneContent({ objects, selectedIds, selectObject, clearSelection, updateObject, startDragHistory }) {
+function SceneContent({ objects, selectedIds, selectObject, clearSelection, updateObject, startDragHistory, viewMode }) {
   const [isDragging, setIsDragging] = useState(false);
 
   return (
@@ -286,7 +288,18 @@ function SceneContent({ objects, selectedIds, selectObject, clearSelection, upda
         ))}
       </Suspense>
 
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow onClick={() => clearSelection()}>
+      {/* Ground Plane */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, -0.01, 0]}
+        receiveShadow
+        onClick={(e) => {
+          if (viewMode === '3D') {
+            e.stopPropagation();
+            clearSelection();
+          }
+        }}
+      >
         <planeGeometry args={[60, 60]} />
         <meshStandardMaterial color="#F1F5F9" roughness={0.95} />
       </mesh>
@@ -320,10 +333,11 @@ function SceneContent({ objects, selectedIds, selectObject, clearSelection, upda
 }
 
 export default function Canvas3D() {
+  const { viewMode } = useUIStore();
   const { objects, selectedIds, selectObject, clearSelection, updateObject, _pushHistory } = useDesignStore();
 
   return (
-    <div className="absolute inset-0 w-full h-full">
+    <div className="absolute inset-0 w-full h-full" data-testid="canvas-3d">
       <Canvas shadows camera={{ position: [10, 10, 10], fov: 45 }}>
         <color attach="background" args={['#0B0F1A']} />
         <fog attach="fog" args={['#0B0F1A', 30, 60]} />
@@ -334,6 +348,7 @@ export default function Canvas3D() {
           clearSelection={clearSelection}
           updateObject={updateObject}
           startDragHistory={_pushHistory}
+          viewMode={viewMode}
         />
       </Canvas>
     </div>

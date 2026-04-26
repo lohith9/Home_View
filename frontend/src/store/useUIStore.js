@@ -21,13 +21,44 @@ export const useUIStore = create((set) => ({
 
   dragItem: null,
   setDragItem: (item) => set({ dragItem: item }),
+  beginPaletteDrag: (item) =>
+    set({
+      dragItem: item,
+      isDrawingWall: false,
+      isMeasuring: false,
+      measurePoints: [],
+      snapGuides: [],
+    }),
+  clearPaletteDrag: () => set({ dragItem: null }),
 
   isDrawingWall: false,
-  setIsDrawingWall: (val) => set({ isDrawingWall: val }),
+  setIsDrawingWall: (val) =>
+    set((state) => ({
+      isDrawingWall: val,
+      dragItem: val ? null : state.dragItem,
+      isMeasuring: val ? false : state.isMeasuring,
+      measurePoints: val ? [] : state.measurePoints,
+      snapGuides: val ? [] : state.snapGuides,
+    })),
+  toggleWallDrawing: () =>
+    set((state) => ({
+      isDrawingWall: !state.isDrawingWall,
+      dragItem: null,
+      isMeasuring: false,
+      measurePoints: [],
+      snapGuides: [],
+    })),
 
   // Measurement tool
   isMeasuring: false,
-  setIsMeasuring: (val) => set({ isMeasuring: val }),
+  setIsMeasuring: (val) =>
+    set((state) => ({
+      isMeasuring: val,
+      isDrawingWall: val ? false : state.isDrawingWall,
+      dragItem: val ? null : state.dragItem,
+      measurePoints: val ? state.measurePoints : [],
+      snapGuides: val ? state.snapGuides : [],
+    })),
   measurePoints: [],  // [{x,y}, {x,y}]
   setMeasurePoints: (pts) => set({ measurePoints: pts }),
 
@@ -38,4 +69,18 @@ export const useUIStore = create((set) => ({
   // Active interaction mode
   interactionMode: 'select', // 'select' | 'resize' | 'rotate'
   setInteractionMode: (mode) => set({ interactionMode: mode }),
+
+  // Active floor level
+  activeFloor: 1,
+  setActiveFloor: (floor) => set({ activeFloor: floor }),
+
+  cancelActiveTool: () =>
+    set({
+      dragItem: null,
+      isDrawingWall: false,
+      isMeasuring: false,
+      measurePoints: [],
+      snapGuides: [],
+      interactionMode: 'select',
+    }),
 }));

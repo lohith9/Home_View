@@ -41,6 +41,14 @@ const catalogItems = {
     { name: 'Wash Basin', price: 12000, type: 'furniture', subType: 'basin', width: 55, height: 45, depth: 85, color: '#DBEAFE', icon: 'BSN' },
     { name: 'Shower', price: 15000, type: 'furniture', subType: 'shower', width: 90, height: 90, depth: 210, color: '#BAE6FD', icon: 'SHR' },
   ],
+  materials: [
+    { name: 'Marble Floor', price: 8000, type: 'furniture', subType: 'floor', width: 200, height: 200, depth: 5, color: '#E2E8F0', icon: '◻️' },
+    { name: 'Wood Floor', price: 6000, type: 'furniture', subType: 'floor', width: 200, height: 200, depth: 5, color: '#92400E', icon: '🪵' },
+    { name: 'Ceramic Tiles', price: 3500, type: 'furniture', subType: 'floor', width: 200, height: 200, depth: 5, color: '#CBD5E1', icon: '🔲' },
+    { name: 'Carpet', price: 4500, type: 'furniture', subType: 'floor', width: 200, height: 200, depth: 3, color: '#7C3AED', icon: '🟪' },
+    { name: 'Granite Slab', price: 12000, type: 'furniture', subType: 'counter', width: 180, height: 60, depth: 5, color: '#1E293B', icon: '⬛' },
+    { name: 'Planter Box', price: 5000, type: 'furniture', subType: 'planter', width: 60, height: 60, depth: 80, color: '#166534', icon: '🌿' },
+  ],
 };
 
 const formatPrice = (price, currency) =>
@@ -50,11 +58,11 @@ export default function Sidebar() {
   const {
     activeTab,
     setActiveTab,
-    setDragItem,
+    beginPaletteDrag,
     viewMode,
     setViewMode,
     isDrawingWall,
-    setIsDrawingWall,
+    toggleWallDrawing,
     setIsMeasuring,
   } = useUIStore();
   const { currency } = useDesignStore();
@@ -62,9 +70,8 @@ export default function Sidebar() {
 
   const handleMouseDown = (event, item) => {
     event.preventDefault();
-    if (isDrawingWall) setIsDrawingWall(false);
-    setIsMeasuring(false);
-    setDragItem({ ...item, offsetX: event.clientX, offsetY: event.clientY });
+    if (viewMode !== '2D') setViewMode('2D');
+    beginPaletteDrag({ ...item, offsetX: event.clientX, offsetY: event.clientY });
   };
 
   const allItems = catalogItems[activeTab] || [];
@@ -154,6 +161,7 @@ export default function Sidebar() {
             return (
               <button
                 key={category.id}
+                data-testid={`sidebar-category-${category.id}`}
                 onClick={() => {
                   setActiveTab(category.id);
                   setSearchQuery('');
@@ -207,27 +215,11 @@ export default function Sidebar() {
           {activeTab === 'walls' && (
             <div
               className="drag-item select-none"
+              data-testid="wall-tool-toggle"
               onClick={() => {
                 if (viewMode !== '2D') setViewMode('2D');
-                setIsDrawingWall(!isDrawingWall);
+                toggleWallDrawing();
                 setIsMeasuring(false);
-              }}
-              onMouseDown={(event) => {
-                event.stopPropagation();
-                if (!isDrawingWall) {
-                  setDragItem({ 
-                    type: 'wall', 
-                    name: 'Wall Segment', 
-                    thickness: 10, 
-                    price: 5000, 
-                    offsetX: event.clientX, 
-                    offsetY: event.clientY, 
-                    icon: '🧱',
-                    width: 200,
-                    height: 10,
-                    color: '#7C3AED'
-                  });
-                }
               }}
               style={{
                 cursor: 'pointer',
@@ -267,10 +259,10 @@ export default function Sidebar() {
                   transition: 'color 0.2s',
                 }}
               >
-                {isDrawingWall ? 'Drawing Mode' : 'Draw Wall'}
+                {isDrawingWall ? '✓ Drawing Mode Active' : 'Draw Wall'}
               </span>
               <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.4 }}>
-                Draw walls in 2D plan, then review them in 3D
+                {isDrawingWall ? 'Click on canvas to draw. Click here to exit.' : 'Click to enter wall drawing mode'}
               </span>
             </div>
           )}
@@ -279,6 +271,7 @@ export default function Sidebar() {
             <div
               key={item.name}
               className="drag-item select-none animate-fade-in"
+              data-testid={`catalog-item-${item.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
               style={{ animationDelay: `${index * 30}ms` }}
               onMouseDown={(event) => {
                 event.stopPropagation();

@@ -138,10 +138,18 @@ export default function TopBar() {
       </div>
 
       <div className="view-toggle">
-        <button className={`view-toggle-btn ${viewMode === '2D' ? 'active' : ''}`} onClick={() => setViewMode('2D')}>
+        <button
+          className={`view-toggle-btn ${viewMode === '2D' ? 'active' : ''}`}
+          onClick={() => setViewMode('2D')}
+          data-testid="view-toggle-2d"
+        >
           2D Plan
         </button>
-        <button className={`view-toggle-btn ${viewMode === '3D' ? 'active' : ''}`} onClick={() => setViewMode('3D')}>
+        <button
+          className={`view-toggle-btn ${viewMode === '3D' ? 'active' : ''}`}
+          onClick={() => setViewMode('3D')}
+          data-testid="view-toggle-3d"
+        >
           3D View
         </button>
       </div>
@@ -179,7 +187,13 @@ export default function TopBar() {
 
         <div style={{ width: '1px', height: '20px', background: 'var(--border-color)', margin: '0 4px' }} />
 
-        <button id="save-btn" className="btn-icon tooltip-container" data-tooltip="Save" onClick={handleSave}>
+        <button
+          id="save-btn"
+          className="btn-icon tooltip-container"
+          data-tooltip="Save"
+          onClick={handleSave}
+          data-testid="save-project"
+        >
           <Save size={15} />
         </button>
         <button className="btn-icon tooltip-container" data-tooltip="Open Project File" onClick={handleOpenClick}>

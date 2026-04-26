@@ -9,7 +9,7 @@ import { useUIStore } from '../store/useUIStore';
 import { useDesignStore } from '../store/useDesignStore';
 
 export default function Editor() {
-  const { viewMode, dragItem, setDragItem, pan, zoom, isDrawingWall } = useUIStore();
+  const { viewMode, dragItem, clearPaletteDrag, pan, zoom, isDrawingWall, cancelActiveTool } = useUIStore();
   const { addObject, undo, redo, removeObject, selectedIds, duplicateSelected } = useDesignStore();
   const [mousePos, setMousePos] = React.useState({
     x: dragItem?.offsetX || 0,
@@ -47,7 +47,7 @@ export default function Editor() {
         }
       }
 
-      setDragItem(null);
+      clearPaletteDrag();
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -57,7 +57,7 @@ export default function Editor() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragItem, pan, zoom, addObject, setDragItem]);
+  }, [dragItem, pan, zoom, addObject, clearPaletteDrag]);
 
   const previewMousePos = dragItem
     ? {
@@ -83,6 +83,10 @@ export default function Editor() {
         duplicateSelected();
       }
 
+      if (event.key === 'Escape') {
+        cancelActiveTool();
+      }
+
       if (event.key === 'Delete' || event.key === 'Backspace') {
         if (document.activeElement?.tagName === 'INPUT') return;
         selectedIds.forEach((id) => removeObject(id));
@@ -91,7 +95,7 @@ export default function Editor() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [undo, redo, selectedIds, removeObject, duplicateSelected]);
+  }, [undo, redo, selectedIds, removeObject, duplicateSelected, cancelActiveTool]);
 
   return (
     <>
@@ -151,27 +155,7 @@ export default function Editor() {
               </div>
             )}
 
-            <div
-              className="absolute inset-0"
-              style={{
-                opacity: viewMode === '2D' ? 1 : 0,
-                pointerEvents: viewMode === '2D' ? 'auto' : 'none',
-                transition: 'opacity 0.45s cubic-bezier(0.4,0,0.2,1)',
-              }}
-            >
-              <Canvas2D />
-            </div>
-
-            <div
-              className="absolute inset-0"
-              style={{
-                opacity: viewMode === '3D' ? 1 : 0,
-                pointerEvents: viewMode === '3D' ? 'auto' : 'none',
-                transition: 'opacity 0.45s cubic-bezier(0.4,0,0.2,1)',
-              }}
-            >
-              <Canvas3D />
-            </div>
+            {viewMode === '2D' ? <Canvas2D /> : <Canvas3D />}
 
             <BottomBar />
           </div>

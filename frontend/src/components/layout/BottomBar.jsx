@@ -7,6 +7,7 @@ export default function BottomBar() {
     vastuMode, toggleVastuMode,
     isMeasuring, setIsMeasuring, setMeasurePoints,
     setPan, setZoom,
+    activeFloor, setActiveFloor,
   } = useUIStore();
 
   const handleMeasureToggle = () => {
@@ -50,10 +51,14 @@ export default function BottomBar() {
 
       <div className="floor-selector">
         <Layers size={16} style={{ color: 'var(--text-secondary)' }} />
-        <select className="floor-select">
-          <option value="1">Ground Floor</option>
-          <option value="2">First Floor</option>
-          <option value="3">Roof</option>
+        <select
+          className="floor-select"
+          value={activeFloor}
+          onChange={(e) => setActiveFloor(Number(e.target.value))}
+        >
+          <option value={1}>Ground Floor</option>
+          <option value={2}>First Floor</option>
+          <option value={3}>Roof</option>
         </select>
       </div>
     </div>
