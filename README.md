@@ -43,7 +43,7 @@ Whether you are building a commercial application, learning 3D web technologies,
 1. Clone the repository:
    ```bash
    https://github.com/lohith9/Home_View.git
-   cd home3d/frontend
+   cd Home_View/frontend
    ```
 2. Install dependencies:
    ```bash
