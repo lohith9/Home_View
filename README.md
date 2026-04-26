@@ -23,7 +23,6 @@ Whether you are building a commercial application, learning 3D web technologies,
 - **Glassmorphism Design:** Modern, sleek interface utilizing translucent panels and a cohesive dark mode aesthetic.
 - **Smart Properties Panel:** Context-aware sidebar displaying dimensions, position, rotation, and custom material settings.
 - **Global State Management:** Robust Undo/Redo history system and local storage persistence.
-- **Keyboard Shortcuts:** Full support for professional workflows (`Delete`/`Backspace` to remove, `Ctrl+Z`/`Ctrl+Y` for history, `Ctrl+D` for duplication).
 
 ## 🛠️ Technology Stack
 
