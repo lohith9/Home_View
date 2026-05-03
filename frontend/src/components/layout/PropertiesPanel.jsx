@@ -154,6 +154,43 @@ export default function PropertiesPanel() {
           </div>
         )}
 
+        {!isWall && selectedObj.attachedTo && (
+          <div className="prop-section">
+            <div className="prop-section-header">
+              <div className="prop-section-icon" style={{ background: 'rgba(16, 185, 129, 0.08)', color: '#10B981' }}>
+                <Box size={13} />
+              </div>
+              <div className="prop-label" style={{ marginBottom: 0 }}>
+                Constraints
+              </div>
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: 'rgba(16, 185, 129, 0.06)',
+                border: '1px solid rgba(16, 185, 129, 0.15)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '8px 10px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '10px' }}>🔗</span>
+                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#10B981' }}>Attached to wall</span>
+              </div>
+              <button
+                className="btn-icon"
+                style={{ padding: '4px', color: 'var(--text-muted)', fontSize: '0.65rem' }}
+                onClick={() => updateObjectWithHistory(selectedObj.id, { attachedTo: null })}
+                title="Detach from wall"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="prop-section">
           <div className="prop-section-header">
             <div className="prop-section-icon">

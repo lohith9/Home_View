@@ -385,6 +385,72 @@ body {
   overflow: hidden;
 }
 
+/* ─── Canvas Zoom Controls (Figma-style) ─── */
+.canvas-zoom-controls {
+  position: absolute;
+  bottom: 80px;
+  right: 24px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(11, 15, 26, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+.zoom-ctrl-btn {
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+.zoom-ctrl-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+.zoom-ctrl-btn:active {
+  background: rgba(124, 58, 237, 0.15);
+  color: var(--primary-light);
+  transform: scale(0.92);
+}
+.zoom-ctrl-percent {
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  min-width: 48px;
+  text-align: center;
+}
+.zoom-ctrl-percent:hover {
+  background: rgba(124, 58, 237, 0.12);
+  color: var(--primary-light);
+}
+.zoom-ctrl-divider {
+  width: 20px;
+  height: 1px;
+  background: rgba(148, 163, 184, 0.15);
+  margin: 2px 0;
+}
+
 /* ─── Bottom Bar ─── */
 .bottom-bar {
   position: absolute;

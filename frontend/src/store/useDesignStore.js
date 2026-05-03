@@ -55,7 +55,10 @@ export const useDesignStore = create((set, get) => ({
   removeObject: (id) => {
     get()._pushHistory();
     set((state) => ({
-      objects: state.objects.filter((obj) => obj.id !== id),
+      // Remove the object and detach any children that were attached to it
+      objects: state.objects
+        .filter((obj) => obj.id !== id)
+        .map((obj) => (obj.attachedTo === id ? { ...obj, attachedTo: null } : obj)),
       selectedIds: state.selectedIds.filter((selectedId) => selectedId !== id),
     }));
   },

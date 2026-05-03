@@ -7,6 +7,7 @@ import Canvas2D from '../components/canvas/Canvas2D';
 import Canvas3D from '../components/canvas/Canvas3D';
 import { useUIStore } from '../store/useUIStore';
 import { useDesignStore } from '../store/useDesignStore';
+import { resolveConstraints } from '../engine/constraintEngine';
 
 export default function Editor() {
   const { viewMode, dragItem, clearPaletteDrag, pan, zoom, isDrawingWall, cancelActiveTool } = useUIStore();
@@ -36,13 +37,27 @@ export default function Editor() {
         if (isInsideCanvas) {
           let x = (event.clientX - rect.left - pan.x) / zoom;
           let y = (event.clientY - rect.top - pan.y) / zoom;
-          x = Math.round(x / 20) * 20;
-          y = Math.round(y / 20) * 20;
           
           if (dragItem.type === 'wall') {
+            // Walls snap strictly to 20px grid
+            x = Math.round(x / 20) * 20;
+            y = Math.round(y / 20) * 20;
             addObject({ ...dragItem, start: [x - 100, y], end: [x + 100, y] });
           } else {
-            addObject({ ...dragItem, x, y, rotation: 0 });
+            // Other items use the constraint engine to auto-attach if dropped on a wall
+            const snap = resolveConstraints(x, y, {
+              objectType: dragItem.type,
+              objects: useDesignStore.getState().objects,
+              gridSize: 20
+            });
+            
+            addObject({ 
+              ...dragItem, 
+              x: snap.x, 
+              y: snap.y, 
+              rotation: 0,
+              attachedTo: snap.attachment ? snap.attachment.wallId : null
+            });
           }
         }
       }
@@ -106,32 +121,6 @@ export default function Editor() {
           <Sidebar />
 
           <div className="canvas-container relative" id="canvas-container-inner">
-            {viewMode === '2D' && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '14px',
-                  left: '14px',
-                  zIndex: 30,
-                  padding: '10px 12px',
-                  borderRadius: '12px',
-                  background: 'rgba(11, 15, 26, 0.78)',
-                  border: '1px solid rgba(148, 163, 184, 0.12)',
-                  color: 'var(--text-primary)',
-                  backdropFilter: 'blur(14px)',
-                  boxShadow: 'var(--shadow-md)',
-                  maxWidth: '280px',
-                }}
-              >
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--primary-light)', marginBottom: '4px' }}>
-                  2D Plan Editor
-                </div>
-                <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
-                  Use 2D to draw walls, place furniture precisely, and align the layout. Switch back to 3D to inspect the room.
-                </div>
-              </div>
-            )}
-
             {viewMode === '3D' && isDrawingWall && (
               <div
                 style={{

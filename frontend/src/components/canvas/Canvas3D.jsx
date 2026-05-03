@@ -288,7 +288,7 @@ function SceneContent({ objects, selectedIds, selectObject, clearSelection, upda
         ))}
       </Suspense>
 
-      {/* Ground Plane */}
+      {/* Ground Plane (Massive to feel infinite) */}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.01, 0]}
@@ -300,13 +300,13 @@ function SceneContent({ objects, selectedIds, selectObject, clearSelection, upda
           }
         }}
       >
-        <planeGeometry args={[60, 60]} />
+        <planeGeometry args={[1000, 1000]} />
         <meshStandardMaterial color="#F1F5F9" roughness={0.95} />
       </mesh>
 
       <Grid
         infiniteGrid
-        fadeDistance={35}
+        fadeDistance={150}
         fadeStrength={1.5}
         sectionColor="#CBD5E1"
         cellColor="#E2E8F0"
@@ -315,7 +315,7 @@ function SceneContent({ objects, selectedIds, selectObject, clearSelection, upda
         position={[0, 0.001, 0]}
       />
 
-      <ContactShadows position={[0, 0.01, 0]} opacity={0.3} scale={60} blur={2.5} far={10} />
+      <ContactShadows position={[0, 0.01, 0]} opacity={0.3} scale={200} blur={2.5} far={10} />
 
       <OrbitControls
         makeDefault

@@ -1,14 +1,19 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ZoomIn, ZoomOut, Maximize, RotateCcw } from 'lucide-react';
 import { useDesignStore } from '../../store/useDesignStore';
 import { useUIStore } from '../../store/useUIStore';
+import { resolveConstraints, resolveWallEndpoint, constrainAngle } from '../../engine/constraintEngine';
+import { checkCollision } from '../../engine/collisionEngine';
+import { propagateWallMove, shouldDetach } from '../../engine/dependencyEngine';
 
 const GRID = 20;
-const SNAP_THRESHOLD = 10;
 const HANDLE_SIZE = 8;
 const ROTATION_HANDLE_OFFSET = 30;
+const MIN_ZOOM = 0.15;
+const MAX_ZOOM = 3;
+const ZOOM_STEP = 0.15; // for button clicks
 
 const snap = (value) => Math.round(value / GRID) * GRID;
-const snapAngle = (degrees) => Math.round(degrees / 15) * 15;
 
 export default function Canvas2D() {
   const {
@@ -49,6 +54,8 @@ export default function Canvas2D() {
   const [measureStart, setMeasureStart] = useState(null);
   const [measureEnd, setMeasureEnd] = useState(null);
   const [hoveredObjId, setHoveredObjId] = useState(null);
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  const localGuidesRef = useRef([]);
 
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0 });
@@ -60,6 +67,7 @@ export default function Canvas2D() {
   const dragSelectionOriginsRef = useRef({});
   const wallDragOriginRef = useRef(null);
   const activePointerIdRef = useRef(null);
+  const spaceHeldRef = useRef(false);
 
   const capturePointer = useCallback((event) => {
     if (!containerRef.current || event.pointerId == null) return;
@@ -115,64 +123,52 @@ export default function Canvas2D() {
     [pan.x, pan.y, zoom],
   );
 
+  /**
+   * smartSnap — wraps the constraint engine for drag operations.
+   * Uses a local ref for guides during drag (perf: avoids store churn)
+   * and flushes to the UI store so other components can read guides.
+   */
   const smartSnap = useCallback(
-    (x, y, excludeId) => {
-      let snappedX = snap(x);
-      let snappedY = snap(y);
-      const guides = [];
+    (x, y, excludeId, objectType = 'furniture') => {
+      const result = resolveConstraints(x, y, {
+        excludeId,
+        objectType,
+        objects,
+        gridSize: GRID,
+      });
 
-      for (const obj of objects) {
-        if (obj.id === excludeId) continue;
+      // Convert constraint-engine guides to the format the renderer expects
+      const guides = result.guides
+        .filter((g) => g.type === 'v' || g.type === 'h')
+        .map((g) => ({ type: g.type, pos: g.pos }));
 
-        if (obj.type === 'wall') {
-          for (const edgeX of [obj.start[0], obj.end[0]]) {
-            if (Math.abs(x - edgeX) < SNAP_THRESHOLD) {
-              snappedX = edgeX;
-              guides.push({ type: 'v', pos: edgeX });
-            }
-          }
-
-          for (const edgeY of [obj.start[1], obj.end[1]]) {
-            if (Math.abs(y - edgeY) < SNAP_THRESHOLD) {
-              snappedY = edgeY;
-              guides.push({ type: 'h', pos: edgeY });
-            }
-          }
-
-          continue;
-        }
-
-        const centerX = obj.x || 0;
-        const centerY = obj.y || 0;
-        const width = obj.width || 100;
-        const height = obj.height || 100;
-
-        for (const candidateX of [centerX, centerX - width / 2, centerX + width / 2]) {
-          if (Math.abs(x - candidateX) < SNAP_THRESHOLD) {
-            snappedX = candidateX;
-            guides.push({ type: 'v', pos: candidateX });
-          }
-        }
-
-        for (const candidateY of [centerY, centerY - height / 2, centerY + height / 2]) {
-          if (Math.abs(y - candidateY) < SNAP_THRESHOLD) {
-            snappedY = candidateY;
-            guides.push({ type: 'h', pos: candidateY });
-          }
-        }
-      }
-
+      localGuidesRef.current = guides;
       setSnapGuides(guides);
-      return { x: snappedX, y: snappedY };
+      return { x: result.x, y: result.y, attachment: result.attachment };
     },
     [objects, setSnapGuides],
   );
+
+  useEffect(() => {
+    if (!isDrawingWall && drawingWallStartRef.current) {
+      setDrawingWallStart(null);
+      drawingWallStartRef.current = null;
+      setCurrentMousePos(null);
+      currentMousePosRef.current = null;
+      setSnapGuides([]);
+    }
+    if (!isMeasuring && measureStart) {
+      setMeasureStart(null);
+      setMeasureEnd(null);
+    }
+  }, [isDrawingWall, isMeasuring, measureStart, setSnapGuides]);
 
   const handleBackgroundPointerDown = (event) => {
     if (dragItem) return;
 
     const coords = getCanvasCoords(event.clientX, event.clientY);
-    const shouldPan = event.button === 1 || event.button === 2 || event.altKey || event.metaKey;
+    // Pan via: middle mouse, right mouse, Alt+drag, Meta+drag, or Space+drag
+    const shouldPan = event.button === 1 || event.button === 2 || event.altKey || event.metaKey || spaceHeldRef.current;
     if (shouldPan) {
       event.preventDefault();
       capturePointer(event);
@@ -202,7 +198,12 @@ export default function Canvas2D() {
 
     if (isDrawingWall) {
       capturePointer(event);
-      const nextPoint = [snap(coords.x), snap(coords.y)];
+      // Use constraint engine for wall endpoints (corner-snap + grid)
+      const wallEndpoint = resolveWallEndpoint(coords.x, coords.y, objects, null, GRID);
+      const nextPoint = [wallEndpoint.x, wallEndpoint.y];
+      if (wallEndpoint.guides.length > 0) {
+        setSnapGuides(wallEndpoint.guides.map((g) => ({ type: g.type, pos: g.pos })));
+      }
       const existingStart = drawingWallStartRef.current;
 
       if (existingStart) {
@@ -260,17 +261,36 @@ export default function Canvas2D() {
       const activeDraggingObjId = draggingObjIdRef.current;
 
       if (activeDraggingObjId) {
+        // Determine the object type for constraint-aware snapping
+        const draggedObj = objects.find((o) => o.id === activeDraggingObjId);
+        const objType = draggedObj?.type || 'furniture';
+
         const wallOrigin = wallDragOriginRef.current;
         if (wallOrigin) {
           const rawX = coords.x - dragOffsetRef.current.x;
           const rawY = coords.y - dragOffsetRef.current.y;
-          const snapped = smartSnap(rawX, rawY, activeDraggingObjId);
+          const snapped = smartSnap(rawX, rawY, activeDraggingObjId, 'wall');
           const deltaX = snapped.x - wallOrigin.midX;
           const deltaY = snapped.y - wallOrigin.midY;
-          updateObject(activeDraggingObjId, {
+
+          // Build old/new wall state for dependency propagation
+          const oldWall = { start: wallOrigin.start, end: wallOrigin.end };
+          const newWall = {
             start: [wallOrigin.start[0] + deltaX, wallOrigin.start[1] + deltaY],
             end: [wallOrigin.end[0] + deltaX, wallOrigin.end[1] + deltaY],
+          };
+
+          updateObject(activeDraggingObjId, {
+            start: newWall.start,
+            end: newWall.end,
           });
+
+          // Parametric: propagate move to attached children (doors, windows)
+          const childUpdates = propagateWallMove(activeDraggingObjId, oldWall, newWall, objects);
+          for (const cu of childUpdates) {
+            updateObject(cu.id, cu.updates);
+          }
+
           return;
         }
 
@@ -278,6 +298,7 @@ export default function Canvas2D() {
           coords.x - dragOffsetRef.current.x,
           coords.y - dragOffsetRef.current.y,
           activeDraggingObjId,
+          objType,
         );
         const leadOrigin = dragStartRef.current || snappedLead;
         const deltaX = snappedLead.x - leadOrigin.x;
@@ -293,7 +314,32 @@ export default function Canvas2D() {
             });
           }
         } else {
-          updateObject(activeDraggingObjId, snappedLead);
+          // Apply collision detection for non-wall objects
+          let finalX = snappedLead.x;
+          let finalY = snappedLead.y;
+
+          if (draggedObj && objType !== 'wall') {
+            const collision = checkCollision(snappedLead.x, snappedLead.y, draggedObj, objects, activeDraggingObjId);
+            if (collision.collides) {
+              finalX = collision.x;
+              finalY = collision.y;
+            }
+          }
+
+          const update = { x: finalX, y: finalY };
+
+          // For door/window: wall-attach or detach logic
+          if (snappedLead.attachment) {
+            update.attachedTo = snappedLead.attachment.wallId;
+          } else if (draggedObj?.attachedTo) {
+            // Check if we should detach (dragged too far from parent wall)
+            const testObj = { ...draggedObj, x: finalX, y: finalY };
+            if (shouldDetach(testObj, objects)) {
+              update.attachedTo = null;
+            }
+          }
+
+          updateObject(activeDraggingObjId, update);
         }
 
         return;
@@ -301,7 +347,7 @@ export default function Canvas2D() {
 
       if (rotating) {
         const angle = Math.atan2(coords.y - rotateCenter.y, coords.x - rotateCenter.x) * (180 / Math.PI) + 90;
-        updateObject(rotating, { rotation: snapAngle(angle) });
+        updateObject(rotating, { rotation: constrainAngle(angle) });
         return;
       }
 
@@ -337,14 +383,23 @@ export default function Canvas2D() {
 
       const wallStart = drawingWallStartRef.current;
       if (wallStart) {
-        let nextX = snap(coords.x);
-        let nextY = snap(coords.y);
+        // Use constraint engine for corner-snap preview while drawing
+        const wallEndpoint = resolveWallEndpoint(coords.x, coords.y, objects, null, GRID);
+        let nextX = wallEndpoint.x;
+        let nextY = wallEndpoint.y;
 
         if (event.shiftKey) {
           const deltaX = Math.abs(nextX - wallStart[0]);
           const deltaY = Math.abs(nextY - wallStart[1]);
           if (deltaX > deltaY) nextY = wallStart[1];
           else nextX = wallStart[0];
+        }
+
+        // Show corner-snap guides during preview
+        if (wallEndpoint.guides.length > 0) {
+          setSnapGuides(wallEndpoint.guides.map((g) => ({ type: g.type, pos: g.pos })));
+        } else {
+          setSnapGuides([]);
         }
 
         currentMousePosRef.current = [nextX, nextY];
@@ -375,6 +430,8 @@ export default function Canvas2D() {
       resizeStart,
       selectionBox,
       setPan,
+      objects,
+      setSnapGuides,
     ],
   );
 
@@ -383,31 +440,11 @@ export default function Canvas2D() {
       if (dragItem) return;
       if (activePointerIdRef.current != null && event.pointerId != null && event.pointerId !== activePointerIdRef.current) return;
 
-      const wallStart = drawingWallStartRef.current;
-      const wallEnd = currentMousePosRef.current;
-
-      if (wallStart && wallEnd) {
-        const [x1, y1] = wallStart;
-        const [x2, y2] = wallEnd;
-        if (Math.hypot(x2 - x1, y2 - y1) > 5) {
-          addObject({
-            type: 'wall',
-            name: 'Wall',
-            start: [x1, y1],
-            end: [x2, y2],
-            thickness: 10,
-            price: 5000,
-          });
-        }
-
+      // Wall drawing is click-based (click-start → click-end), NOT drag-based.
+      // Do NOT commit wall on pointerUp — let handleBackgroundPointerDown handle it.
+      // Just keep the preview alive while the user moves toward the second click.
+      if (drawingWallStartRef.current) {
         releasePointer(event.pointerId);
-        if (Math.hypot(x2 - x1, y2 - y1) > 5) {
-          setDrawingWallStart(null);
-          drawingWallStartRef.current = null;
-          setCurrentMousePos(null);
-          currentMousePosRef.current = null;
-          setSnapGuides([]);
-        }
         return;
       }
 
@@ -484,7 +521,6 @@ export default function Canvas2D() {
     },
     [
       dragItem,
-      addObject,
       setSnapGuides,
       releasePointer,
       rotating,
@@ -522,18 +558,129 @@ export default function Canvas2D() {
     };
   }, [dragItem, hasActiveInteraction, handlePointerMove, handlePointerUp]);
 
-  const handleWheel = (event) => {
-    event.preventDefault();
+  /**
+   * Cursor-centered zoom with trackpad normalization.
+   * Supports both discrete mouse wheel and continuous trackpad gestures.
+   * Uses the Figma formula: zoom toward cursor position.
+   */
+  const handleWheel = useCallback(
+    (event) => {
+      event.preventDefault();
+      if (!containerRef.current) return;
+
+      // If ctrlKey/metaKey is held, perform ZOOM
+      if (event.ctrlKey || event.metaKey) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+
+        // Trackpad pinch-zoom sends ctrlKey + deltaY; normalize for smooth feel
+        const isTrackpad = Math.abs(event.deltaY) < 50;
+        const sensitivity = isTrackpad ? 0.008 : 0.0025;
+        const delta = -event.deltaY * sensitivity;
+        const factor = Math.pow(2, delta);
+
+        const nextZoom = Math.min(Math.max(MIN_ZOOM, zoom * factor), MAX_ZOOM);
+        if (nextZoom === zoom) return;
+
+        // Pan correction: keep the world point under cursor stable
+        const scale = nextZoom / zoom;
+        const nextPanX = mouseX - (mouseX - pan.x) * scale;
+        const nextPanY = mouseY - (mouseY - pan.y) * scale;
+
+        setZoom(nextZoom);
+        setPan({ x: nextPanX, y: nextPanY });
+      } else {
+        // If no modifier is held, perform PAN (Figma default for scroll wheels / trackpad)
+        // Shift + Wheel already translates to deltaX in modern browsers/trackpads
+        setPan({
+          x: pan.x - event.deltaX,
+          y: pan.y - event.deltaY,
+        });
+      }
+    },
+    [zoom, pan, setZoom, setPan],
+  );
+
+  /**
+   * Zoom in/out by a fixed step, centered on the canvas viewport center.
+   * Used by toolbar buttons and keyboard shortcuts.
+   */
+  const zoomByStep = useCallback(
+    (direction) => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+
+      const factor = direction > 0 ? (1 + ZOOM_STEP) : (1 / (1 + ZOOM_STEP));
+      const nextZoom = Math.min(Math.max(MIN_ZOOM, zoom * factor), MAX_ZOOM);
+      if (nextZoom === zoom) return;
+
+      const scale = nextZoom / zoom;
+      const nextPanX = centerX - (centerX - pan.x) * scale;
+      const nextPanY = centerY - (centerY - pan.y) * scale;
+      setZoom(nextZoom);
+      setPan({ x: nextPanX, y: nextPanY });
+    },
+    [zoom, pan, setZoom, setPan],
+  );
+
+  /**
+   * Reset view: zoom=1, pan=0 with smooth transition.
+   */
+  const resetView = useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, [setZoom, setPan]);
+
+  /**
+   * Fit all objects into the viewport with padding.
+   */
+  const fitToView = useCallback(() => {
+    if (!containerRef.current || objects.length === 0) {
+      resetView();
+      return;
+    }
+
     const rect = containerRef.current.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
-    const zoomFactor = event.deltaY < 0 ? 1.08 : 0.92;
-    const nextZoom = Math.min(Math.max(0.2, zoom * zoomFactor), 5);
-    const nextPanX = mouseX - (mouseX - pan.x) * (nextZoom / zoom);
-    const nextPanY = mouseY - (mouseY - pan.y) * (nextZoom / zoom);
-    setZoom(nextZoom);
-    setPan({ x: nextPanX, y: nextPanY });
-  };
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    for (const obj of objects) {
+      if (obj.type === 'wall') {
+        minX = Math.min(minX, obj.start[0], obj.end[0]);
+        minY = Math.min(minY, obj.start[1], obj.end[1]);
+        maxX = Math.max(maxX, obj.start[0], obj.end[0]);
+        maxY = Math.max(maxY, obj.start[1], obj.end[1]);
+      } else {
+        const x = obj.x || 0;
+        const y = obj.y || 0;
+        const w = obj.width || 100;
+        const h = obj.height || 100;
+        minX = Math.min(minX, x - w / 2);
+        minY = Math.min(minY, y - h / 2);
+        maxX = Math.max(maxX, x + w / 2);
+        maxY = Math.max(maxY, y + h / 2);
+      }
+    }
+
+    const contentW = maxX - minX;
+    const contentH = maxY - minY;
+    if (contentW <= 0 || contentH <= 0) { resetView(); return; }
+
+    const padding = 80;
+    const scaleX = (rect.width - padding * 2) / contentW;
+    const scaleY = (rect.height - padding * 2) / contentH;
+    const fitZoom = Math.min(Math.max(MIN_ZOOM, Math.min(scaleX, scaleY)), MAX_ZOOM);
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    const fitPanX = rect.width / 2 - centerX * fitZoom;
+    const fitPanY = rect.height / 2 - centerY * fitZoom;
+
+    setZoom(fitZoom);
+    setPan({ x: fitPanX, y: fitPanY });
+  }, [objects, setZoom, setPan, resetView]);
 
   const handleObjectPointerDown = (event, obj) => {
     event.stopPropagation();
@@ -627,10 +774,63 @@ export default function Canvas2D() {
   );
 
   const currency = useDesignStore((state) => state.currency);
+  const zoomPercent = Math.round(zoom * 100);
+
+  // Spacebar hold for panning + keyboard zoom shortcuts
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === ' ' && !e.repeat && document.activeElement?.tagName !== 'INPUT') {
+        e.preventDefault();
+        spaceHeldRef.current = true;
+        setSpaceHeld(true);
+      }
+      // Ctrl/Cmd + = / + to zoom in
+      if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        zoomByStep(1);
+      }
+      // Ctrl/Cmd + - to zoom out
+      if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+        e.preventDefault();
+        zoomByStep(-1);
+      }
+      // Ctrl/Cmd + 0 to reset view
+      if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        e.preventDefault();
+        resetView();
+      }
+      // Ctrl/Cmd + 1 to fit to view
+      if ((e.ctrlKey || e.metaKey) && e.key === '1') {
+        e.preventDefault();
+        fitToView();
+      }
+    };
+    const onKeyUp = (e) => {
+      if (e.key === ' ') {
+        spaceHeldRef.current = false;
+        setSpaceHeld(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, [zoomByStep, resetView, fitToView]);
+
+  // Passive-false wheel listener for smooth zoom (React onWheel can't preventDefault)
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [handleWheel]);
 
   let cursor = 'default';
   if (dragItem) cursor = 'copy';
   else if (isPanning) cursor = 'grabbing';
+  else if (spaceHeld) cursor = 'grab';
   else if (isDrawingWall || isMeasuring) cursor = 'crosshair';
   else if (resizing) cursor = 'nwse-resize';
   else if (rotating) cursor = 'grab';
@@ -645,10 +845,10 @@ export default function Canvas2D() {
       onPointerUp={handlePointerUp}
       onPointerCancel={resetTransientInteraction}
       onPointerLeave={() => setHoveredObjId(null)}
-      onWheel={handleWheel}
       onContextMenu={(event) => event.preventDefault()}
       style={{ cursor, touchAction: 'none' }}
     >
+      {/* ── Context hint ── */}
       <div
         style={{
           position: 'absolute',
@@ -666,7 +866,60 @@ export default function Canvas2D() {
           fontWeight: 600,
         }}
       >
-        {isDrawingWall ? 'Click and drag to draw a wall' : 'Middle click or Alt + drag to pan'}
+        {isDrawingWall
+          ? 'Click to set start, click again to place wall'
+          : spaceHeld
+            ? '⎵ Drag to pan'
+            : 'Scroll to zoom • Space + drag to pan'}
+      </div>
+
+      {/* ── Zoom Controls Overlay ── */}
+      <div className="canvas-zoom-controls" data-testid="zoom-controls">
+        <button
+          className="zoom-ctrl-btn"
+          data-testid="zoom-in-btn"
+          onClick={() => zoomByStep(1)}
+          title="Zoom in (Ctrl +)"
+        >
+          <ZoomIn size={15} strokeWidth={2} />
+        </button>
+
+        <button
+          className="zoom-ctrl-percent"
+          onClick={resetView}
+          title="Reset to 100% (Ctrl 0)"
+        >
+          {zoomPercent}%
+        </button>
+
+        <button
+          className="zoom-ctrl-btn"
+          data-testid="zoom-out-btn"
+          onClick={() => zoomByStep(-1)}
+          title="Zoom out (Ctrl −)"
+        >
+          <ZoomOut size={15} strokeWidth={2} />
+        </button>
+
+        <div className="zoom-ctrl-divider" />
+
+        <button
+          className="zoom-ctrl-btn"
+          data-testid="fit-view-btn"
+          onClick={fitToView}
+          title="Fit to view (Ctrl 1)"
+        >
+          <Maximize size={14} strokeWidth={2} />
+        </button>
+
+        <button
+          className="zoom-ctrl-btn"
+          data-testid="reset-view-btn"
+          onClick={resetView}
+          title="Reset view (Ctrl 0)"
+        >
+          <RotateCcw size={14} strokeWidth={2} />
+        </button>
       </div>
 
       {objects.length === 0 && !isDrawingWall && !dragItem && (
@@ -954,6 +1207,31 @@ export default function Canvas2D() {
                   </span>
                 )}
               </div>
+
+              {obj.attachedTo && (
+                <div
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: `${x + width / 2 - 12}px`,
+                    top: `${y + height / 2 - 12}px`,
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    background: 'rgba(16, 185, 129, 0.9)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '8px',
+                    color: 'white',
+                    fontWeight: 700,
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                    zIndex: 900,
+                  }}
+                  title="Attached to wall"
+                >
+                  🔗
+                </div>
+              )}
 
               {isSelected && selectedIds.length === 1 && (
                 <>
