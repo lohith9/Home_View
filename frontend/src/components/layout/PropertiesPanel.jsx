@@ -22,6 +22,7 @@ export default function PropertiesPanel() {
     selectedIds,
     updateObjectWithHistory,
     removeObject,
+    removeObjects,
     currency,
     bringForward,
     sendBackward,
@@ -71,7 +72,7 @@ export default function PropertiesPanel() {
           <button
             className="btn btn-danger"
             style={{ flex: 1, borderRadius: 'var(--radius-md)' }}
-            onClick={() => selectedObjects.forEach((obj) => removeObject(obj.id))}
+            onClick={() => removeObjects(selectedIds)}
           >
             <Trash2 size={14} /> Delete
           </button>
@@ -176,7 +177,7 @@ export default function PropertiesPanel() {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '10px' }}>🔗</span>
+                <span style={{ fontSize: '10px' }} aria-hidden="true">LINK</span>
                 <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#10B981' }}>Attached to wall</span>
               </div>
               <button
@@ -185,7 +186,7 @@ export default function PropertiesPanel() {
                 onClick={() => updateObjectWithHistory(selectedObj.id, { attachedTo: null })}
                 title="Detach from wall"
               >
-                ✕
+                ×
               </button>
             </div>
           </div>

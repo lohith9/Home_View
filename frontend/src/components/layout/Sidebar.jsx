@@ -42,12 +42,12 @@ const catalogItems = {
     { name: 'Shower', price: 15000, type: 'furniture', subType: 'shower', width: 90, height: 90, depth: 210, color: '#BAE6FD', icon: 'SHR' },
   ],
   materials: [
-    { name: 'Marble Floor', price: 8000, type: 'furniture', subType: 'floor', width: 200, height: 200, depth: 5, color: '#E2E8F0', icon: '◻️' },
-    { name: 'Wood Floor', price: 6000, type: 'furniture', subType: 'floor', width: 200, height: 200, depth: 5, color: '#92400E', icon: '🪵' },
-    { name: 'Ceramic Tiles', price: 3500, type: 'furniture', subType: 'floor', width: 200, height: 200, depth: 5, color: '#CBD5E1', icon: '🔲' },
-    { name: 'Carpet', price: 4500, type: 'furniture', subType: 'floor', width: 200, height: 200, depth: 3, color: '#7C3AED', icon: '🟪' },
-    { name: 'Granite Slab', price: 12000, type: 'furniture', subType: 'counter', width: 180, height: 60, depth: 5, color: '#1E293B', icon: '⬛' },
-    { name: 'Planter Box', price: 5000, type: 'furniture', subType: 'planter', width: 60, height: 60, depth: 80, color: '#166534', icon: '🌿' },
+    { name: 'Marble Floor', price: 8000, type: 'furniture', subType: 'floor', width: 200, height: 200, depth: 5, color: '#E2E8F0', icon: 'MRB' },
+    { name: 'Wood Floor', price: 6000, type: 'furniture', subType: 'floor', width: 200, height: 200, depth: 5, color: '#92400E', icon: 'WD' },
+    { name: 'Ceramic Tiles', price: 3500, type: 'furniture', subType: 'floor', width: 200, height: 200, depth: 5, color: '#CBD5E1', icon: 'TIL' },
+    { name: 'Carpet', price: 4500, type: 'furniture', subType: 'floor', width: 200, height: 200, depth: 3, color: '#7C3AED', icon: 'RUG' },
+    { name: 'Granite Slab', price: 12000, type: 'furniture', subType: 'counter', width: 180, height: 60, depth: 5, color: '#1E293B', icon: 'GRT' },
+    { name: 'Planter Box', price: 5000, type: 'furniture', subType: 'planter', width: 60, height: 60, depth: 80, color: '#166534', icon: 'PLNT' },
   ],
 };
 
@@ -259,7 +259,7 @@ export default function Sidebar() {
                   transition: 'color 0.2s',
                 }}
               >
-                {isDrawingWall ? '✓ Drawing Mode Active' : 'Draw Wall'}
+                {isDrawingWall ? 'Drawing Mode Active' : 'Draw Wall'}
               </span>
               <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.4 }}>
                 {isDrawingWall ? 'Click on canvas to draw. Click here to exit.' : 'Click to enter wall drawing mode'}

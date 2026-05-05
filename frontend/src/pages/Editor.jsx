@@ -11,7 +11,7 @@ import { resolveConstraints } from '../engine/constraintEngine';
 
 export default function Editor() {
   const { viewMode, dragItem, clearPaletteDrag, pan, zoom, isDrawingWall, cancelActiveTool } = useUIStore();
-  const { addObject, undo, redo, removeObject, selectedIds, duplicateSelected } = useDesignStore();
+  const { addObject, undo, redo, removeObjects, selectedIds, duplicateSelected } = useDesignStore();
   const [mousePos, setMousePos] = React.useState({
     x: dragItem?.offsetX || 0,
     y: dragItem?.offsetY || 0,
@@ -103,14 +103,20 @@ export default function Editor() {
       }
 
       if (event.key === 'Delete' || event.key === 'Backspace') {
-        if (document.activeElement?.tagName === 'INPUT') return;
-        selectedIds.forEach((id) => removeObject(id));
+        const activeElement = document.activeElement;
+        const isTypingTarget =
+          activeElement?.tagName === 'INPUT' ||
+          activeElement?.tagName === 'TEXTAREA' ||
+          activeElement?.tagName === 'SELECT' ||
+          activeElement?.isContentEditable;
+        if (isTypingTarget) return;
+        removeObjects(selectedIds);
       }
     };
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [undo, redo, selectedIds, removeObject, duplicateSelected, cancelActiveTool]);
+  }, [undo, redo, selectedIds, removeObjects, duplicateSelected, cancelActiveTool]);
 
   return (
     <>
