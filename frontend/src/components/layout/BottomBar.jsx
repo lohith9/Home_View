@@ -8,6 +8,7 @@ export default function BottomBar() {
     isMeasuring, setIsMeasuring, setMeasurePoints,
     setPan, setZoom,
     activeFloor, setActiveFloor,
+    measurementUnit, setMeasurementUnit,
   } = useUIStore();
 
   const handleMeasureToggle = () => {
@@ -59,6 +60,18 @@ export default function BottomBar() {
           <option value={1}>Ground Floor</option>
           <option value={2}>First Floor</option>
           <option value={3}>Roof</option>
+        </select>
+      </div>
+
+      <div className="floor-selector">
+        <select
+          className="floor-select"
+          aria-label="Measurement unit"
+          value={measurementUnit}
+          onChange={(e) => setMeasurementUnit(e.target.value)}
+        >
+          <option value="metric">Meters</option>
+          <option value="imperial">Feet</option>
         </select>
       </div>
     </div>

@@ -63,6 +63,19 @@ export const useDesignStore = create((set, get) => ({
     }));
   },
 
+  removeObjects: (ids) => {
+    const idSet = new Set(ids.filter(Boolean));
+    if (idSet.size === 0) return;
+
+    get()._pushHistory();
+    set((state) => ({
+      objects: state.objects
+        .filter((obj) => !idSet.has(obj.id))
+        .map((obj) => (obj.attachedTo && idSet.has(obj.attachedTo) ? { ...obj, attachedTo: null } : obj)),
+      selectedIds: state.selectedIds.filter((selectedId) => !idSet.has(selectedId)),
+    }));
+  },
+
   duplicateSelected: () => {
     const { objects, selectedIds } = get();
     if (selectedIds.length === 0) return;

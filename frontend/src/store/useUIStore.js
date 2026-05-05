@@ -74,6 +74,9 @@ export const useUIStore = create((set) => ({
   activeFloor: 1,
   setActiveFloor: (floor) => set({ activeFloor: floor }),
 
+  measurementUnit: 'metric',
+  setMeasurementUnit: (measurementUnit) => set({ measurementUnit }),
+
   cancelActiveTool: () =>
     set({
       dragItem: null,

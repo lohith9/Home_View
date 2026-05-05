@@ -773,8 +773,17 @@ export default function Canvas2D() {
     [objects],
   );
 
-  const currency = useDesignStore((state) => state.currency);
+  const measurementUnit = useUIStore((state) => state.measurementUnit);
   const zoomPercent = Math.round(zoom * 100);
+  const formatDistance = useCallback(
+    (length) => {
+      const meters = length / 100;
+      return measurementUnit === 'imperial'
+        ? `${(meters * 3.281).toFixed(2)}ft`
+        : `${meters.toFixed(2)}m`;
+    },
+    [measurementUnit],
+  );
 
   // Spacebar hold for panning + keyboard zoom shortcuts
   useEffect(() => {
@@ -953,7 +962,7 @@ export default function Canvas2D() {
               animation: 'pulseGlow 3s ease-in-out infinite',
             }}
           >
-            🏠
+            HOME
           </div>
           <div>
             <div
@@ -1227,9 +1236,8 @@ export default function Canvas2D() {
                     boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
                     zIndex: 900,
                   }}
-                  title="Attached to wall"
-                >
-                  🔗
+                  title="Attached to wall">
+                  LINK
                 </div>
               )}
 
@@ -1383,7 +1391,7 @@ export default function Canvas2D() {
                   whiteSpace: 'nowrap',
                 }}
               >
-                {currency === 'INR' ? `${(length / 100).toFixed(2)}m` : `${((length / 100) * 3.281).toFixed(2)}ft`}
+                {formatDistance(length)}
               </div>
             </>
           );
@@ -1424,7 +1432,7 @@ export default function Canvas2D() {
                   whiteSpace: 'nowrap',
                 }}
               >
-                {currency === 'INR' ? `${(length / 100).toFixed(2)}m` : `${((length / 100) * 3.281).toFixed(2)}ft`}
+                {formatDistance(length)}
               </div>
             </>
           );

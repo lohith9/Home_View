@@ -213,6 +213,7 @@ export default function TopBar() {
             background: 'var(--primary-gradient)',
             letterSpacing: '0.01em',
           }}
+          onClick={() => setStatusText('AI suggestions are not available yet')}
         >
           <Wand2 size={13} /> AI Suggest
         </button>
