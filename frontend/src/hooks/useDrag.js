@@ -4,6 +4,9 @@
  * Uses useDesignStore as the single source of truth.
  * Converts client coordinates to canvas coordinates using pan/zoom
  * and snaps to the 20px grid, matching Canvas2D behaviour.
+ *
+ * History: beginGesture() is called once on the first pointer move of a
+ * gesture, so the entire drag undoes as a single step.
  */
 import { useCallback, useRef } from 'react';
 import { useDesignStore } from '../store/useDesignStore';
@@ -14,7 +17,7 @@ const snap = (v) => Math.round(v / GRID) * GRID;
 
 export const useDrag = () => {
   const updateObject = useDesignStore((s) => s.updateObject);
-  const _pushHistory = useDesignStore((s) => s._pushHistory);
+  const beginGesture = useDesignStore((s) => s.beginGesture);
   const selectedIds = useDesignStore((s) => s.selectedIds);
   const pan = useUIStore((s) => s.pan);
   const zoom = useUIStore((s) => s.zoom);
@@ -55,9 +58,9 @@ export const useDrag = () => {
     (e) => {
       if (!isDragging.current || !selectedId) return;
 
-      // Push history once per drag gesture
+      // Snapshot history once per drag gesture
       if (!historyPushed.current) {
-        _pushHistory();
+        beginGesture();
         historyPushed.current = true;
       }
 
@@ -69,7 +72,7 @@ export const useDrag = () => {
         y: snap(canvasY - dragOffset.current.y),
       });
     },
-    [selectedId, updateObject, _pushHistory, pan, zoom],
+    [selectedId, updateObject, beginGesture, pan, zoom],
   );
 
   /**
