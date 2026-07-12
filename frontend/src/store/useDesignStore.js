@@ -2,12 +2,26 @@ import { create } from 'zustand';
 
 const MAX_HISTORY = 50;
 
-const cloneObjects = (objects) => JSON.parse(JSON.stringify(objects));
+// Deep clone for history snapshots.
+// structuredClone is preferred (faster, preserves more types than JSON round-trip);
+// JSON fallback covers older environments.
+// NOTE: because every mutation in this store is immutable, snapshots could share
+// references instead of cloning — see docs/adr/ADR-002-snapshot-history.md for
+// why we still clone defensively.
+const cloneObjects = (objects) =>
+  typeof structuredClone === 'function'
+    ? structuredClone(objects)
+    : JSON.parse(JSON.stringify(objects));
 
 const pushToPast = (past, snapshot) => {
   const nextPast = [...past, cloneObjects(snapshot)];
   return nextPast.length > MAX_HISTORY ? nextPast.slice(-MAX_HISTORY) : nextPast;
 };
+
+// Next z-index must derive from the current maximum, not the array length:
+// after any deletion, objects.length can collide with an existing zIndex.
+const nextZIndex = (objects) =>
+  objects.reduce((max, obj) => Math.max(max, obj.zIndex ?? 0), -1) + 1;
 
 export const useDesignStore = create((set, get) => ({
   objects: [],
@@ -16,7 +30,15 @@ export const useDesignStore = create((set, get) => ({
   past: [],
   future: [],
 
-  _pushHistory: () => {
+  /**
+   * beginGesture — snapshot the current state into undo history.
+   *
+   * Call exactly once at the start of a user gesture (drag, resize, rotate),
+   * before the first updateObject call, so the whole gesture undoes as one step.
+   * For single atomic edits pass { history: true } to updateObject instead.
+   * Do not combine both for the same edit — it would create two history entries.
+   */
+  beginGesture: () => {
     const { objects, past } = get();
     set({
       past: pushToPast(past, objects),
@@ -24,12 +46,15 @@ export const useDesignStore = create((set, get) => ({
     });
   },
 
+  /** @deprecated Use beginGesture(). Kept as an alias for backward compatibility. */
+  _pushHistory: () => get().beginGesture(),
+
   addObject: (obj) => {
-    get()._pushHistory();
+    get().beginGesture();
     const newObj = {
       ...obj,
       id: `${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
-      zIndex: get().objects.length,
+      zIndex: nextZIndex(get().objects),
     };
 
     set((state) => ({
@@ -40,20 +65,27 @@ export const useDesignStore = create((set, get) => ({
     return newObj.id;
   },
 
-  updateObject: (id, updates) =>
-    set((state) => ({
-      objects: state.objects.map((obj) => (obj.id === id ? { ...obj, ...updates } : obj)),
-    })),
-
-  updateObjectWithHistory: (id, updates) => {
-    get()._pushHistory();
+  /**
+   * updateObject — patch a single object.
+   *
+   * @param {string} id
+   * @param {object} updates
+   * @param {{ history?: boolean }} [options] - pass { history: true } for atomic
+   *   edits that should be undoable on their own. For continuous gestures call
+   *   beginGesture() once at gesture start and leave history off here.
+   */
+  updateObject: (id, updates, options = {}) => {
+    if (options.history) get().beginGesture();
     set((state) => ({
       objects: state.objects.map((obj) => (obj.id === id ? { ...obj, ...updates } : obj)),
     }));
   },
 
+  /** @deprecated Use updateObject(id, updates, { history: true }). */
+  updateObjectWithHistory: (id, updates) => get().updateObject(id, updates, { history: true }),
+
   removeObject: (id) => {
-    get()._pushHistory();
+    get().beginGesture();
     set((state) => ({
       // Remove the object and detach any children that were attached to it
       objects: state.objects
@@ -67,7 +99,7 @@ export const useDesignStore = create((set, get) => ({
     const idSet = new Set(ids.filter(Boolean));
     if (idSet.size === 0) return;
 
-    get()._pushHistory();
+    get().beginGesture();
     set((state) => ({
       objects: state.objects
         .filter((obj) => !idSet.has(obj.id))
@@ -80,10 +112,11 @@ export const useDesignStore = create((set, get) => ({
     const { objects, selectedIds } = get();
     if (selectedIds.length === 0) return;
 
-    get()._pushHistory();
+    get().beginGesture();
 
     const newIds = [];
     const newObjects = [];
+    let zIndex = nextZIndex(objects);
 
     for (const id of selectedIds) {
       const obj = objects.find((entry) => entry.id === id);
@@ -91,10 +124,11 @@ export const useDesignStore = create((set, get) => ({
 
       const newId = `${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
       const clone = {
-        ...JSON.parse(JSON.stringify(obj)),
+        ...cloneObjects(obj),
         id: newId,
-        zIndex: objects.length + newObjects.length,
+        zIndex: zIndex,
       };
+      zIndex += 1;
 
       if (clone.type === 'wall') {
         clone.start = [clone.start[0] + 20, clone.start[1] + 20];
@@ -130,7 +164,7 @@ export const useDesignStore = create((set, get) => ({
   clearSelection: () => set({ selectedIds: [] }),
 
   bringForward: (id) => {
-    get()._pushHistory();
+    get().beginGesture();
     set((state) => {
       const sorted = [...state.objects].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
       const index = sorted.findIndex((obj) => obj.id === id);
@@ -146,7 +180,7 @@ export const useDesignStore = create((set, get) => ({
   },
 
   sendBackward: (id) => {
-    get()._pushHistory();
+    get().beginGesture();
     set((state) => {
       const sorted = [...state.objects].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
       const index = sorted.findIndex((obj) => obj.id === id);
