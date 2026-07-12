@@ -1,81 +1,71 @@
-# Home3D - Open Source 3D Home Designer
+# Home3D — Open-Source 3D Home Designer
 
-![Home3D Banner](https://via.placeholder.com/1200x400/0B0F1A/7C3AED?text=Home3D+Open+Source+Planner)
+Design a home in 2D. Walk through it in 3D. Same data, zero desync.
 
-Home3D is an open-source, production-grade interior design and floor planning application. Our mission is to democratize high-quality 3D spatial design by providing developers and designers with a powerful, extensible, and free web-based tool. 
+Home3D is an open-source floor-plan editor and 3D visualizer that runs entirely in the browser — built with React, Three.js, and a single Zustand store as the source of truth.
 
-Whether you are building a commercial application, learning 3D web technologies, or designing your own home, Home3D gives you the perfect foundation.
+## Features
 
-## 🚀 Key Features
+- 2D floor-plan editor: snap-to-grid (20px), wall drawing with visual snap guides, drag-and-drop furniture placement
+- Live 3D viewport: real-time sync from the 2D plan, with lighting, soft shadows, and ambient occlusion
+- Direct 3D manipulation: select and drag objects in the 3D scene without losing camera position
+- Undo/redo across both views via incremental state snapshots
+- Designs persist across refreshes via local storage
 
-### 📐 2D Floor Plan Editor
-- **Precision Grid System:** Snap-to-grid mechanics (20px increments) for accurate architectural layout.
-- **Wall Drawing Engine:** Draw, connect, and reposition walls dynamically with visual snap guides.
-- **Drag & Drop Placement:** Intuitive drag-and-drop from the component sidebar directly onto the canvas.
-- **Advanced Selection & Manipulation:** Select, multi-select (Shift+Click), move, rotate, and resize objects using dedicated interaction handles.
+## Architecture
 
-### 🏠 High-Fidelity 3D Viewport
-- **Real-Time 3D Rendering:** Instantaneous synchronization between the 2D plan and 3D space.
-- **Direct 3D Interaction:** Select, drag, and reposition furniture directly within the 3D scene without losing your camera angle.
-- **Immersive Environment:** Integrated lighting, dynamic soft shadows, and ambient occlusion powered by Three.js.
+Neither view owns the data. Both are projections of one store.
 
-### 💻 Modern UI/UX
-- **Glassmorphism Design:** Modern, sleek interface utilizing translucent panels and a cohesive dark mode aesthetic.
-- **Smart Properties Panel:** Context-aware sidebar displaying dimensions, position, rotation, and custom material settings.
-- **Global State Management:** Robust Undo/Redo history system and local storage persistence.
+```mermaid
+flowchart TB
+    A[2D Canvas] -- mutations --> S[(useDesignStore - Zustand)]
+    B[3D Scene - react-three-fiber] -- mutations --> S
+    C[Properties Panel] -- mutations --> S
+    S -- subscribe --> A
+    S -- subscribe --> B
+    S -- subscribe --> C
+    S --> H[History - incremental snapshots]
+    H -- undo/redo --> S
+    S -- persist --> L[(localStorage)]
+```
 
-## 🛠️ Technology Stack
+### Engineering decisions
 
-- **Core Framework:** React 18, Vite
-- **State Management:** Zustand (unified state across 2D/3D and UI)
-- **3D Engine:** Three.js, @react-three/fiber, @react-three/drei
-- **Styling:** Tailwind CSS & Vanilla CSS (Glassmorphism & SaaS Design Tokens)
-- **Icons:** Lucide React
+- One store, two projections: every mutation goes through useDesignStore, so the 2D and 3D views cannot desync.
+- Pointer-event isolation: interaction handles capture events before camera controls see them, so dragging an object and orbiting the camera never fight over the mouse.
+- Snapshot-based undo/redo: simpler than a command pattern, and memory-cheap at floor-plan scale.
 
-## 📦 Getting Started
+## Getting started
 
-### Prerequisites
-- Node.js (v18+ recommended)
-- npm, yarn, or pnpm
+```bash
+git clone https://github.com/lohith9/Home_View.git
+cd Home_View/frontend
+npm install
+npm run dev
+```
 
-### Installation
-1. Clone the repository:
-   ```bash
-   https://github.com/lohith9/Home_View.git
-   cd Home_View/frontend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
-4. Open `http://localhost:5173` in your browser.
+Open http://localhost:5173 in your browser. Requires Node 18+.
 
-## 🤝 Contributing
+**Stack:** React 18 · Vite · Zustand · Three.js · @react-three/fiber · @react-three/drei · Tailwind CSS
 
-Home3D is an open-source project, and we welcome contributions from the community! Whether it's fixing bugs, adding new 3D models, improving performance, or writing documentation, your help is appreciated.
+## Known limitations
 
-### How to Contribute
-1. **Fork the repository** to your own GitHub account.
-2. **Create a new branch** for your feature or bug fix (`git checkout -b feature/amazing-feature`).
-3. **Make your changes** and commit them with descriptive messages.
-4. **Push your branch** to your fork (`git push origin feature/amazing-feature`).
-5. **Open a Pull Request** against the main repository.
+- No automated tests yet — the next engineering priority before new features
+- Single-floor designs only
+- Fixed furniture catalog; custom model import is on the roadmap
 
-### Development Roadmap
-- [ ] Export designs to standard 3D formats (GLTF/OBJ).
-- [ ] Import custom 3D models dynamically.
-- [ ] Implement a room auto-furnishing algorithm.
-- [ ] Real-time multiplayer collaboration.
+## Roadmap
 
-## 🏗️ Architecture Notes
-- **Unified Store:** `useDesignStore` acts as the single source of truth for all spatial data, ensuring 2D and 3D views never desync.
-- **Event Isolation:** Careful pointer event handling separates camera controls from object interactions, allowing smooth object dragging in the 3D view.
-- **History Tracking:** Incremental state snapshots power the robust undo/redo system without blocking the main render thread.
+- [ ] Test coverage and CI (GitHub Actions)
+- [ ] Export designs to GLTF/OBJ
+- [ ] Custom 3D model import
+- [ ] Room auto-furnishing
+- [ ] Real-time collaboration
 
-## 📄 License
+## Contributing
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. This means you are free to use, modify, and distribute the software for both personal and commercial projects.
+Issues and PRs welcome — the roadmap above is a good place to start.
+
+## License
+
+MIT
